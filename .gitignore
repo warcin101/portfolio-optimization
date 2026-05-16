@@ -1,0 +1,10 @@
+data-archive/
+__pycache__/
+*.pyc
+.DS_Store
+*.egg-info/
+.venv/
+venv/
+movs_etf.csv
+claude.md
+to-do.md
