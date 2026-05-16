@@ -18,6 +18,17 @@ from backtest import walk_forward, performance_stats
 HOLDINGS_CSV = Path(__file__).parent / "movs_etf.csv"
 
 st.set_page_config(page_title="ETF Portfolio Tracker", layout="wide")
+
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+    html, body, [class*="css"] {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+                     Roboto, Helvetica, Arial, sans-serif !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 st.title("ETF Portfolio Tracker")
 
 with st.sidebar:
@@ -76,14 +87,14 @@ with tab1:
                 "Target Weight": "{:.1%}",
                 "Drift": "{:+.1%}",
             }),
-            use_container_width=True,
+            width='stretch',
         )
 
         fig = go.Figure()
         fig.add_trace(go.Bar(name="Current", x=overview.index, y=overview["Current Weight"]))
         fig.add_trace(go.Bar(name="Target (HRP)", x=overview.index, y=overview["Target Weight"]))
         fig.update_layout(barmode="group", yaxis_tickformat=".0%", title="Current vs Target Weights")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
     st.subheader("HRP Target Weights (full universe)")
     tw_df = target_weights.reset_index()
@@ -91,7 +102,7 @@ with tab1:
     tw_df["Name"] = tw_df["Ticker"].map(lambda t: METADATA.get(t, {}).get("name", t))
     fig2 = px.pie(tw_df, values="Weight", names="Ticker", hover_data=["Name"],
                   title="HRP Target Allocation")
-    st.plotly_chart(fig2, use_container_width=True)
+    st.plotly_chart(fig2, width='stretch')
 
 with tab2:
     st.subheader(f"Monthly Buy Signal — Budget: ${monthly_budget:,.0f}")
@@ -116,13 +127,13 @@ with tab2:
             "target_weight": "{:.1%}",
             "drift_after": "{:+.1%}",
         }),
-        use_container_width=True,
+        width='stretch',
     )
 
     fig3 = px.bar(display.reset_index(names="Ticker"), x="Ticker", y="buy_usd",
                   labels={"buy_usd": "Amount to buy (USD)"},
                   title="Capital Deployment This Month")
-    st.plotly_chart(fig3, use_container_width=True)
+    st.plotly_chart(fig3, width='stretch')
 
 with tab3:
     st.subheader("Yearly Rebalance Check")
@@ -150,14 +161,14 @@ with tab3:
                 lambda v: "color: red" if v == "SELL" else ("color: green" if v == "BUY" else ""),
                 subset=["action"],
             ),
-            use_container_width=True,
+            width='stretch',
         )
 
         fig4 = go.Figure()
         fig4.add_trace(go.Bar(name="Current", x=rebal_df.index, y=rebal_df["current_weight"]))
         fig4.add_trace(go.Bar(name="Target", x=rebal_df.index, y=rebal_df["target_weight"]))
         fig4.update_layout(barmode="group", yaxis_tickformat=".0%", title="Current vs Target — Rebalance View")
-        st.plotly_chart(fig4, use_container_width=True)
+        st.plotly_chart(fig4, width='stretch')
 
 with tab4:
     st.subheader("Walk-forward Backtest")
@@ -175,7 +186,7 @@ with tab4:
 
     fig5 = px.line(nav, title=f"Portfolio NAV — {strategy.upper()} (base 100)",
                    labels={"value": "NAV", "index": "Date"})
-    st.plotly_chart(fig5, use_container_width=True)
+    st.plotly_chart(fig5, width='stretch')
 
     st.subheader("HRP vs Equal Weight vs Risk Parity")
     with st.spinner("Running comparison..."):
@@ -185,11 +196,11 @@ with tab4:
 
     comparison = pd.DataFrame({"HRP": nav_hrp, "Equal Weight": nav_eq, "Risk Parity": nav_rp}).dropna()
     fig6 = px.line(comparison, title="Strategy Comparison (base 100)")
-    st.plotly_chart(fig6, use_container_width=True)
+    st.plotly_chart(fig6, width='stretch')
 
     stats_all = {
         "HRP": performance_stats(nav_hrp),
         "Equal Weight": performance_stats(nav_eq),
         "Risk Parity": performance_stats(nav_rp),
     }
-    st.dataframe(pd.DataFrame(stats_all).T, use_container_width=True)
+    st.dataframe(pd.DataFrame(stats_all).T, width='stretch')

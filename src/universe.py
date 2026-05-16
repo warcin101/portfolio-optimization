@@ -7,8 +7,11 @@ TICKERS = [
     "EWJ",   # Japan
     "VWO",   # Emerging Markets broad (covers EM including India, China, Brazil)
     # Sectors
-    "ICLN",  # Global Clean Energy
     "XLV",   # Healthcare
+    # Real Estate
+    "REET",  # Global REITs (proxy for Amundi FTSE EPRA NAREIT Global)
+    # Commodities
+    "GLD",   # Gold (proxy for iShares Physical Gold ETC — physically backed, no roll cost)
 ]
 
 METADATA = {
@@ -17,8 +20,9 @@ METADATA = {
     "VGK":  {"name": "Vanguard FTSE Europe ETF",                 "region": "Europe",   "type": "Broad Equity"},
     "EWJ":  {"name": "iShares MSCI Japan ETF",                   "region": "Japan",    "type": "Broad Equity"},
     "VWO":  {"name": "Vanguard FTSE Emerging Markets ETF",       "region": "EM Broad", "type": "Broad Equity"},
-    "ICLN": {"name": "iShares Global Clean Energy ETF",          "region": "Global",   "type": "Sector"},
     "XLV":  {"name": "Healthcare Select Sector SPDR ETF",        "region": "US",       "type": "Sector"},
+    "REET": {"name": "iShares Global REIT ETF",                  "region": "Global",   "type": "Real Estate"},
+    "GLD":  {"name": "SPDR Gold Shares",                         "region": "Global",   "type": "Commodity"},
 }
 
 UCITS_MAP = {
@@ -27,6 +31,7 @@ UCITS_MAP = {
     "VGK":  "CEBZ.DE",   # iShares Core MSCI Europe UCITS — confirmed on XTB
     "EWJ":  "CJPU.UK",   # iShares MSCI Japan UCITS — confirmed on XTB
     "VWO":  "EIMI.UK",   # iShares Core MSCI EM IMI UCITS — confirmed on XTB
-    "ICLN": "IQQH.DE",   # iShares Global Clean Energy UCITS — confirmed on XTB
     "XLV":  "CBUF.DE",   # iShares MSCI World Healthcare ESG UCITS — confirmed on XTB
+    "REET": "10AJ.DE",   # Amundi FTSE EPRA NAREIT Global — confirmed on XTB
+    "GLD":  "EGLN.UK",   # iShares Physical Gold ETC (physically backed) — confirmed on XTB
 }
