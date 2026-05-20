@@ -10,12 +10,13 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 from universe import TICKERS, METADATA, UCITS_MAP
-from data import fetch_prices, log_returns, simple_returns, current_holdings
+from data import fetch_prices, log_returns, simple_returns
 from optimize import hrp_weights, equal_weights
 from signals import monthly_buy_signal, yearly_rebalance_signal
 from backtest import walk_forward, performance_stats
+from xtb import parse_xtb_export, find_latest_xtb_export
 
-HOLDINGS_CSV = Path(__file__).parent / "movs_etf.csv"
+XTB_EXPORT = find_latest_xtb_export()
 
 st.set_page_config(page_title="ETF Portfolio Tracker", layout="wide")
 
@@ -51,8 +52,12 @@ if prices is None or prices.empty:
 log_ret = log_returns(prices)
 simple_ret = simple_returns(prices)
 
-holdings_qty = current_holdings(HOLDINGS_CSV)
+_xtb = parse_xtb_export(XTB_EXPORT) if XTB_EXPORT else pd.DataFrame(columns=["value_usd", "volume", "ucits_ticker"])
+holdings_value_usd = _xtb["value_usd"] if not _xtb.empty else pd.Series(dtype=float)
+holdings_volume = _xtb["volume"] if not _xtb.empty else pd.Series(dtype=float)
 latest_prices = prices.iloc[-1]
+# Equivalent US quantities: value / US price — keeps signal functions unchanged
+holdings_qty = (holdings_value_usd / latest_prices.reindex(holdings_value_usd.index)).dropna()
 
 target_weights = hrp_weights(log_ret.tail(lookback))
 
@@ -62,7 +67,7 @@ with tab1:
     st.subheader("Current Holdings")
 
     if holdings_qty.empty:
-        st.info("No holdings yet. Add transactions to movs_etf.csv to see your portfolio here.")
+        st.info("No holdings yet. Drop an XTB account export (account_*.xlsx) in the project folder to see your portfolio here.")
     else:
         current_values = (holdings_qty * latest_prices).dropna()
         total_value = current_values.sum()
@@ -70,8 +75,7 @@ with tab1:
 
         overview = pd.DataFrame({
             "XTB Ticker": pd.Series({t: UCITS_MAP.get(t) or "—" for t in current_w.index}),
-            "Qty": holdings_qty,
-            "Price (USD)": latest_prices,
+            "Qty (XTB)": holdings_volume.reindex(current_w.index),
             "Value (USD)": current_values,
             "Current Weight": current_w,
             "Target Weight": target_weights.reindex(current_w.index, fill_value=0),
@@ -81,7 +85,7 @@ with tab1:
         st.metric("Total Portfolio Value", f"${total_value:,.2f}")
         st.dataframe(
             overview.style.format({
-                "Price (USD)": "${:.2f}",
+                "Qty (XTB)": "{:.4f}",
                 "Value (USD)": "${:,.2f}",
                 "Current Weight": "{:.1%}",
                 "Target Weight": "{:.1%}",
