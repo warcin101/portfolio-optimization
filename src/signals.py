@@ -6,8 +6,8 @@ def monthly_buy_signal(holdings_qty, target_weights, new_capital, latest_prices)
     Buy-only signal: allocate new_capital to move portfolio toward target weights.
     holdings_qty: pd.Series, ticker -> quantity held
     target_weights: pd.Series, ticker -> target weight (sum to 1)
-    latest_prices: pd.Series, ticker -> current price (USD)
-    Returns: pd.DataFrame with columns [ticker, buy_usd, buy_qty, new_weight]
+    latest_prices: pd.Series, ticker -> current price (PLN)
+    Returns: pd.DataFrame with columns [ticker, buy_pln, buy_qty, new_weight]
     """
     current_values = (holdings_qty * latest_prices).fillna(0)
     total_current = current_values.sum()
@@ -19,20 +19,20 @@ def monthly_buy_signal(holdings_qty, target_weights, new_capital, latest_prices)
     if gap.sum() == 0:
         gap = target_weights * new_capital
 
-    buy_usd = gap / gap.sum() * new_capital
-    buy_qty = (buy_usd / latest_prices).fillna(0)
+    buy_pln = gap / gap.sum() * new_capital
+    buy_qty = (buy_pln / latest_prices).fillna(0)
 
-    total_new_values = current_values + buy_usd
+    total_new_values = current_values + buy_pln
     new_weights = total_new_values / total_new_values.sum()
 
     result = pd.DataFrame({
-        "buy_usd": buy_usd,
+        "buy_pln": buy_pln,
         "buy_qty": buy_qty,
         "new_weight": new_weights,
         "target_weight": target_weights,
     }).fillna(0)
     result["drift_after"] = result["new_weight"] - result["target_weight"]
-    return result.sort_values("buy_usd", ascending=False)
+    return result.sort_values("buy_pln", ascending=False)
 
 
 def yearly_rebalance_signal(holdings_qty, target_weights, latest_prices, drift_threshold=0.05):
@@ -55,15 +55,15 @@ def yearly_rebalance_signal(holdings_qty, target_weights, latest_prices, drift_t
     should_rebalance = (drift.abs() > drift_threshold).any()
 
     target_values = tw * total
-    trade_usd = target_values - current_values.reindex(all_tickers, fill_value=0)
+    trade_pln = target_values - current_values.reindex(all_tickers, fill_value=0)
 
     result = pd.DataFrame({
         "current_weight": cw,
         "target_weight": tw,
         "drift": drift,
-        "trade_usd": trade_usd,
+        "trade_pln": trade_pln,
     })
-    result["action"] = result["trade_usd"].apply(
+    result["action"] = result["trade_pln"].apply(
         lambda x: "BUY" if x > 0 else ("SELL" if x < 0 else "HOLD")
     )
     return result.sort_values("drift", ascending=False), should_rebalance

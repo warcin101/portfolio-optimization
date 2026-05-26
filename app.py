@@ -14,7 +14,7 @@ from data import fetch_prices, log_returns, simple_returns
 from optimize import hrp_weights, equal_weights
 from signals import monthly_buy_signal, yearly_rebalance_signal
 from backtest import walk_forward, performance_stats
-from xtb import parse_xtb_export, find_latest_xtb_export
+from xtb import parse_xtb_export, find_latest_xtb_export, get_plnusd_rate
 
 XTB_EXPORT = find_latest_xtb_export()
 
@@ -35,7 +35,7 @@ st.title("ETF Portfolio Tracker")
 with st.sidebar:
     st.header("Settings")
     refresh = st.button("Refresh prices")
-    monthly_budget = st.number_input("Monthly budget (USD)", min_value=50, max_value=50000, value=500, step=50)
+    monthly_budget = st.number_input("Monthly budget (PLN)", min_value=500, max_value=200000, value=5000, step=500)
     drift_threshold = st.slider("Drift threshold (%)", 1, 20, 5) / 100
     lookback = st.slider("Lookback months", 6, 36, 24)
 
@@ -52,12 +52,15 @@ if prices is None or prices.empty:
 log_ret = log_returns(prices)
 simple_ret = simple_returns(prices)
 
-_xtb = parse_xtb_export(XTB_EXPORT) if XTB_EXPORT else pd.DataFrame(columns=["value_usd", "volume", "ucits_ticker"])
-holdings_value_usd = _xtb["value_usd"] if not _xtb.empty else pd.Series(dtype=float)
+_plnusd = get_plnusd_rate()
+_usdpln = 1.0 / _plnusd
+latest_prices_pln = prices.iloc[-1] * _usdpln
+
+_xtb = parse_xtb_export(XTB_EXPORT) if XTB_EXPORT else pd.DataFrame(columns=["value_pln", "volume", "ucits_ticker"])
+holdings_value_pln = _xtb["value_pln"] if not _xtb.empty else pd.Series(dtype=float)
 holdings_volume = _xtb["volume"] if not _xtb.empty else pd.Series(dtype=float)
-latest_prices = prices.iloc[-1]
-# Equivalent US quantities: value / US price — keeps signal functions unchanged
-holdings_qty = (holdings_value_usd / latest_prices.reindex(holdings_value_usd.index)).dropna()
+# Equivalent US quantities: PLN value / PLN price — keeps signal functions unchanged
+holdings_qty = (holdings_value_pln / latest_prices_pln.reindex(holdings_value_pln.index)).dropna()
 
 target_weights = hrp_weights(log_ret.tail(lookback))
 
@@ -69,24 +72,24 @@ with tab1:
     if holdings_qty.empty:
         st.info("No holdings yet. Drop an XTB account export (account_*.xlsx) in the project folder to see your portfolio here.")
     else:
-        current_values = (holdings_qty * latest_prices).dropna()
+        current_values = (holdings_qty * latest_prices_pln).dropna()
         total_value = current_values.sum()
         current_w = current_values / total_value
 
         overview = pd.DataFrame({
             "XTB Ticker": pd.Series({t: UCITS_MAP.get(t) or "—" for t in current_w.index}),
             "Qty (XTB)": holdings_volume.reindex(current_w.index),
-            "Value (USD)": current_values,
+            "Value (PLN)": current_values,
             "Current Weight": current_w,
             "Target Weight": target_weights.reindex(current_w.index, fill_value=0),
-        }).dropna(subset=["Value (USD)"])
+        }).dropna(subset=["Value (PLN)"])
         overview["Drift"] = overview["Current Weight"] - overview["Target Weight"]
 
-        st.metric("Total Portfolio Value", f"${total_value:,.2f}")
+        st.metric("Total Portfolio Value", f"{total_value:,.2f} PLN")
         st.dataframe(
             overview.style.format({
                 "Qty (XTB)": "{:.4f}",
-                "Value (USD)": "${:,.2f}",
+                "Value (PLN)": "{:,.2f} PLN",
                 "Current Weight": "{:.1%}",
                 "Target Weight": "{:.1%}",
                 "Drift": "{:+.1%}",
@@ -109,23 +112,23 @@ with tab1:
     st.plotly_chart(fig2, width='stretch')
 
 with tab2:
-    st.subheader(f"Monthly Buy Signal — Budget: ${monthly_budget:,.0f}")
+    st.subheader(f"Monthly Buy Signal — Budget: {monthly_budget:,.0f} PLN")
     st.caption("Buy-only: allocates new capital to move portfolio toward HRP targets without selling.")
 
     signal = monthly_buy_signal(
         holdings_qty if not holdings_qty.empty else pd.Series(dtype=float),
         target_weights,
         monthly_budget,
-        latest_prices,
+        latest_prices_pln,
     )
 
-    display = signal[signal["buy_usd"] > 0.01].copy()
-    display["buy_qty"] = display["buy_usd"] / latest_prices.reindex(display.index)
+    display = signal[signal["buy_pln"] > 0.01].copy()
+    display["buy_qty"] = display["buy_pln"] / latest_prices_pln.reindex(display.index)
     display["XTB Ticker"] = display.index.map(lambda t: UCITS_MAP.get(t) or "—")
 
     st.dataframe(
-        display[["XTB Ticker", "buy_usd", "buy_qty", "new_weight", "target_weight", "drift_after"]].style.format({
-            "buy_usd": "${:,.2f}",
+        display[["XTB Ticker", "buy_pln", "buy_qty", "new_weight", "target_weight", "drift_after"]].style.format({
+            "buy_pln": "{:,.2f} PLN",
             "buy_qty": "{:.4f}",
             "new_weight": "{:.1%}",
             "target_weight": "{:.1%}",
@@ -134,8 +137,8 @@ with tab2:
         width='stretch',
     )
 
-    fig3 = px.bar(display.reset_index(names="Ticker"), x="Ticker", y="buy_usd",
-                  labels={"buy_usd": "Amount to buy (USD)"},
+    fig3 = px.bar(display.reset_index(names="Ticker"), x="Ticker", y="buy_pln",
+                  labels={"buy_pln": "Amount to buy (PLN)"},
                   title="Capital Deployment This Month")
     st.plotly_chart(fig3, width='stretch')
 
@@ -143,10 +146,10 @@ with tab3:
     st.subheader("Yearly Rebalance Check")
 
     if holdings_qty.empty:
-        st.info("No holdings to analyse. Add transactions to movs_etf.csv first.")
+        st.info("No holdings to analyse. Drop an XTB account export to see rebalance recommendations.")
     else:
         rebal_df, should_rebalance = yearly_rebalance_signal(
-            holdings_qty, target_weights, latest_prices, drift_threshold
+            holdings_qty, target_weights, latest_prices_pln, drift_threshold
         )
 
         if should_rebalance:
@@ -156,11 +159,11 @@ with tab3:
 
         rebal_df["XTB Ticker"] = rebal_df.index.map(lambda t: UCITS_MAP.get(t) or "—")
         st.dataframe(
-            rebal_df[["XTB Ticker", "current_weight", "target_weight", "drift", "trade_usd", "action"]].style.format({
+            rebal_df[["XTB Ticker", "current_weight", "target_weight", "drift", "trade_pln", "action"]].style.format({
                 "current_weight": "{:.1%}",
                 "target_weight": "{:.1%}",
                 "drift": "{:+.1%}",
-                "trade_usd": "${:+,.2f}",
+                "trade_pln": "{:+,.2f} PLN",
             }).applymap(
                 lambda v: "color: red" if v == "SELL" else ("color: green" if v == "BUY" else ""),
                 subset=["action"],

@@ -8,8 +8,8 @@ _UCITS_TO_US = {v: k for k, v in UCITS_MAP.items()}
 SNAPSHOT_DIR = Path(__file__).parent.parent / "data-archive" / "xtb-portfolio-export-snapshot"
 
 
-def _plnusd_rate():
-    """Fetch current PLN/USD exchange rate."""
+def get_plnusd_rate():
+    """Fetch current PLN/USD exchange rate (daily close, last available)."""
     raw = yf.download("PLNUSD=X", period="5d", auto_adjust=True, progress=False, threads=False)
     return float(raw["Close"].dropna().iloc[-1])
 
@@ -17,7 +17,7 @@ def _plnusd_rate():
 def parse_xtb_export(path):
     """
     Read an XTB account XLSX export and return current holdings as
-    {us_ticker: usd_value} using the PLN purchase value × live PLN/USD rate.
+    {us_ticker: value_pln} using the raw PLN purchase value from the export.
     """
     xl = pd.ExcelFile(Path(path))
 
@@ -33,11 +33,10 @@ def parse_xtb_export(path):
     df["us_ticker"] = df["Symbol"].map(_UCITS_TO_US)
     df = df.dropna(subset=["us_ticker"])
 
-    plnusd = _plnusd_rate()
-    df["value_usd"] = df["Purchase value"] * plnusd
+    df["value_pln"] = df["Purchase value"]
 
     grouped = df.groupby("us_ticker").agg(
-        value_usd=("value_usd", "sum"),
+        value_pln=("value_pln", "sum"),
         volume=("Volume", "sum"),
         ucits_ticker=("Symbol", "first"),
     )
