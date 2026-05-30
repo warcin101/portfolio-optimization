@@ -1,4 +1,7 @@
-data-archive/
+data-archive/*
+!data-archive/xtb-portfolio-export-snapshot/
+data-archive/xtb-portfolio-export-snapshot/*
+!data-archive/xtb-portfolio-export-snapshot/account_example*.xlsx
 __pycache__/
 *.pyc
 .DS_Store
