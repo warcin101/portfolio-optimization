@@ -39,9 +39,11 @@ with st.sidebar:
     drift_threshold = st.slider("Drift threshold (%)", 1, 20, 5) / 100
     lookback = st.slider("Lookback months", 6, 36, 24)
 
-@st.cache_data(show_spinner="Fetching prices...")
+# No st.cache_data: fetch_prices already caches in parquet, and a Streamlit cache keyed on
+# the button flag serves stale pre-refresh data on the next rerun (flag flips back to False).
 def load_prices(refresh_flag):
-    return fetch_prices(TICKERS, refresh=refresh_flag)
+    with st.spinner("Fetching prices..."):
+        return fetch_prices(TICKERS, refresh=refresh_flag)
 
 prices = load_prices(refresh)
 
