@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 from universe import TICKERS, METADATA, UCITS_MAP
 from data import fetch_prices, log_returns, simple_returns
 from optimize import hrp_weights, equal_weights
-from signals import monthly_buy_signal, yearly_rebalance_signal
+from signals import monthly_buy_signal, yearly_rebalance_signal, CONCENTRATION_FLOOR, CONCENTRATION_MULT
 from backtest import walk_forward, performance_stats
 from xtb import parse_xtb_export, find_latest_xtb_export, get_plnusd_rate
 
@@ -36,7 +36,6 @@ with st.sidebar:
     st.header("Settings")
     refresh = st.button("Refresh prices")
     monthly_budget = st.number_input("Monthly budget (PLN)", min_value=500, max_value=200000, value=5000, step=500)
-    drift_threshold = st.slider("Drift threshold (%)", 1, 20, 5) / 100
     lookback = st.slider("Lookback months", 6, 36, 24)
 
 # No st.cache_data: fetch_prices already caches in parquet, and a Streamlit cache keyed on
@@ -150,18 +149,22 @@ with tab3:
     if holdings_qty.empty:
         st.info("No holdings to analyse. Drop an XTB account export to see rebalance recommendations.")
     else:
-        rebal_df, should_rebalance = yearly_rebalance_signal(
-            holdings_qty, target_weights, latest_prices_pln, drift_threshold
-        )
+        rebal_df, _ = yearly_rebalance_signal(holdings_qty, target_weights, latest_prices_pln)
 
-        if should_rebalance:
-            st.warning(f"Rebalancing recommended — one or more positions drifted >{drift_threshold:.0%} from target.")
+        over_cap = rebal_df[rebal_df["over_cap"]]
+        if not over_cap.empty:
+            flagged = ", ".join(f"{t} {r.current_weight:.0%} (target {r.target_weight:.0%})" for t, r in over_cap.iterrows())
+            st.error(
+                f"Concentration alert — {flagged}: above {CONCENTRATION_FLOOR:.0%} and {CONCENTRATION_MULT:.0f}× target. "
+                "Monthly buys already skip it; trimming is your call (selling realises 19% tax on gains)."
+            )
         else:
-            st.success(f"Portfolio is on track — all positions within {drift_threshold:.0%} of target.")
+            st.success(f"No concentration alert — no holding above {CONCENTRATION_FLOOR:.0%} and {CONCENTRATION_MULT:.0f}× its target.")
+        st.caption("Drift and trade columns are informational: HRP targets move month to month, so drift alone is not a rebalance signal.")
 
         rebal_df["XTB Ticker"] = rebal_df.index.map(lambda t: UCITS_MAP.get(t) or "—")
         st.dataframe(
-            rebal_df[["XTB Ticker", "current_weight", "target_weight", "drift", "trade_pln", "action"]].style.format({
+            rebal_df[["XTB Ticker", "current_weight", "target_weight", "drift", "trade_pln", "action", "over_cap"]].style.format({
                 "current_weight": "{:.1%}",
                 "target_weight": "{:.1%}",
                 "drift": "{:+.1%}",

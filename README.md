@@ -25,7 +25,7 @@ streamlit run app.py
 |-----|-------------|
 | **Portfolio** | Current holdings vs HRP target weights |
 | **Monthly Buy** | Buy-only signal: allocates new capital toward target weights without selling |
-| **Yearly Rebalance** | Drift analysis — BUY/SELL/HOLD recommendations when any position drifts beyond threshold |
+| **Yearly Rebalance** | Concentration alert (a holding above 20% of the portfolio *and* above 2× its target) plus informational drift and BUY/SELL/HOLD columns |
 | **Backtest** | Walk-forward backtest comparing HRP, Equal Weight, and Risk Parity |
 
 ## Asset universe
@@ -36,4 +36,4 @@ streamlit run app.py
 
 - Price history is cached in `data-archive/prices.parquet`. Delete it and click **Refresh prices** to force a fresh download.
 - Optimization and backtesting run on USD prices (currency-agnostic log returns). All display values are converted to PLN using the live PLNUSD rate from yfinance.
-- The **Yearly Rebalance** tab is informational, not prescriptive. It shows what selling and buying would be needed to return to target weights — whether to act on it is entirely up to you.
+- The **Yearly Rebalance** tab is informational, not prescriptive. It shows what selling and buying would be needed to return to target weights — whether to act on it is entirely up to you. Drift from the current target alone is not treated as a signal, because HRP targets move month to month and the strategy is buy-only; the concentration alert is the guardrail for one holding running away after a price rally.

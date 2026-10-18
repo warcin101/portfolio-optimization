@@ -35,10 +35,17 @@ def monthly_buy_signal(holdings_qty, target_weights, new_capital, latest_prices)
     return result.sort_values("buy_pln", ascending=False)
 
 
+# Concentration alert: a holding is flagged when its weight is above BOTH the floor and
+# MULT x its current target. Buy-only can't sell, so a price run-up (e.g. gold) can leave one
+# ticker dominating risk; drift vs the noisy HRP target is too noisy to catch that.
+CONCENTRATION_FLOOR = 0.20
+CONCENTRATION_MULT = 2.0
+
+
 def yearly_rebalance_signal(holdings_qty, target_weights, latest_prices, drift_threshold=0.05):
     """
     Analyse drift from target and recommend rebalancing trades if needed.
-    Returns: pd.DataFrame with current/target weights, drift, suggested trades.
+    Returns: pd.DataFrame with current/target weights, drift, suggested trades, over_cap flag.
     """
     current_values = (holdings_qty * latest_prices).fillna(0)
     total = current_values.sum()
@@ -62,6 +69,7 @@ def yearly_rebalance_signal(holdings_qty, target_weights, latest_prices, drift_t
         "target_weight": tw,
         "drift": drift,
         "trade_pln": trade_pln,
+        "over_cap": (cw > CONCENTRATION_FLOOR) & (cw > CONCENTRATION_MULT * tw),
     })
     result["action"] = result["trade_pln"].apply(
         lambda x: "BUY" if x > 0 else ("SELL" if x < 0 else "HOLD")
